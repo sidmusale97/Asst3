@@ -123,12 +123,18 @@ void echo(int client_socket)
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 void handleRead(char * cmessage, int client_socket)
 {
 	char server_message[256] = {0};
 	char dels[2] = ","; //delimeters for strtok 
 
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
+=======
+	}
+	else if(funcID == 2)
+	{
+>>>>>>> parent of 8f41ec8... fixed netread
 =======
 	}
 	else if(funcID == 2)
@@ -201,9 +207,12 @@ void handleRead(char * cmessage, int client_socket)
 	int serverfd = temp->serverfd;
 	
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int writeFile = write(serverfd,(void *)&buffer,bytesToWrite);
 	if(writeFile < 0)
 =======
+=======
+>>>>>>> parent of 8f41ec8... fixed netread
 
 
 	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);

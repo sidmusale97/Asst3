@@ -29,11 +29,14 @@ int main(int argc, char ** argv)
 	char a[100] = "hello my name is sid";
 	int openType = atoi(argv[2]);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int file = netopen(argv[1], openType);
 	int readFile = netread(file, (void *)&a, sizeof(a));
 	printf("Bytes Read: %d, %s\n", readFile, a);
 	int written = netwrite(file, (void *)&a, sizeof(a));
 =======
+=======
+>>>>>>> parent of 8f41ec8... fixed netread
 	int file = netopen(argv[1], O_RDWR);
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,256);
@@ -41,6 +44,9 @@ int main(int argc, char ** argv)
 	int s = netread(file,(void *)&a,10);
 	printf("Bytes Read: %d,%s\n",s,a);
 	int close = netclose(file);	
+<<<<<<< HEAD
+>>>>>>> parent of 8f41ec8... fixed netread
+=======
 >>>>>>> parent of 8f41ec8... fixed netread
 	}
 }
