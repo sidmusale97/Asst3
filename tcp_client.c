@@ -30,11 +30,14 @@ int main(int argc, char ** argv)
 	int openType = atoi(argv[2]);
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	int file = netopen(argv[1], openType);
 	int readFile = netread(file, (void *)&a, sizeof(a));
 	printf("Bytes Read: %d, %s\n", readFile, a);
 	int written = netwrite(file, (void *)&a, sizeof(a));
 =======
+=======
+>>>>>>> parent of 8f41ec8... fixed netread
 =======
 >>>>>>> parent of 8f41ec8... fixed netread
 	int file = netopen(argv[1], O_RDWR);
@@ -45,6 +48,9 @@ int main(int argc, char ** argv)
 	printf("Bytes Read: %d,%s\n",s,a);
 	int close = netclose(file);	
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 8f41ec8... fixed netread
+=======
 >>>>>>> parent of 8f41ec8... fixed netread
 =======
 >>>>>>> parent of 8f41ec8... fixed netread
