@@ -9,9 +9,24 @@
 #include <pthread.h>
 #include <fcntl.h>
 
+typedef struct fdNode{
+	int serverfd;
+	int clientfd;
+	struct fdNode * next;
+	int openMode;
+}fdNode;
+
+
 void echo(int client_socket);
 int createServerSocket();
 void * handleRequest(void * arg);
+void insertfdNode(fdNode * node);
+int getFreeClientfd();
+fdNode * get_Node_from_cfd(int clientfd);
+void deletefdNode(int clientfd);
+
+
+fdNode * allfds = NULL;
 	
 int main()
 {
@@ -23,7 +38,7 @@ int main()
 	{
 	client_socket = (int *)malloc(sizeof(int));
 	*client_socket = accept(server_socket, NULL, NULL);
-	pthread_create(&tid, NULL,handleRequest,client_socket);
+	pthread_create(&tid,NULL,handleRequest,client_socket);
 	}
 
 return 0;
@@ -94,13 +109,161 @@ void echo(int client_socket)
 	}
 	else
 	{
-		sprintf(server_message, "%d", fd*-1);
+		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
+		newNode->serverfd = fd;
+		newNode->clientfd = getFreeClientfd();
+		newNode->next = NULL;
+		insertfdNode(newNode);
+		sprintf(server_message, "%d",newNode->clientfd);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+
+	}
+	else if(funcID == 2)
+	{
+	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
+	int clientfd = atoi(tok);
+	tok = strtok(NULL, dels);
+	int bytesRequested = atoi(tok);
+
+	fdNode * temp = get_Node_from_cfd(clientfd);
+	int serverfd = temp->serverfd;
+	char buffer[bytesRequested+1];
+
+
+	int readFile = read(serverfd,buffer,bytesRequested);
+	if(readFile < 0)
+	{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", readFile);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+	else
+	{	
+		sprintf(server_message,"%d", readFile);
+		strcat(server_message,",");
+		if(readFile == bytesRequested)buffer[bytesRequested] = '\0';
+		else{
+			buffer[readFile] = '\0';
+		}
+		strcat(server_message,buffer);
 		write(client_socket,server_message, sizeof(server_message));
 	}
 	}
+	else if(funcID == 3)
+	{
+		tok = strtok(NULL, dels);//move to next parameter which is clientfd
+		int clientfd = atoi(tok);
+		fdNode * temp = get_Node_from_cfd(clientfd);
+		int serverfd = temp->serverfd;
+		int closeFile = close(serverfd);
+		if (closeFile < 0)
+		{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", closeFile);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+		}
+		else
+		{
+		deletefdNode(clientfd);
+		sprintf(server_message, "%d", closeFile);
+		write(client_socket,server_message,sizeof(server_message));	
+		}
+	}
+	else if(funcID == 4)
+	{
+	char buffer[256];
+	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
+	int clientfd = atoi(tok);
+	tok = strtok(NULL, dels);
+	strcpy((char *)&buffer,tok);
+	tok = strtok(NULL, dels);
+	int bytesToWrite = atoi(tok);
+
+	fdNode * temp = get_Node_from_cfd(clientfd);
+	int serverfd = temp->serverfd;
+	
+
+
+	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
+	if(writeFile != bytesToWrite)
+	{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+	else
+	{	
+		sprintf(server_message,"%d", writeFile);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+}
+}
+void insertfdNode(fdNode * node)
+{
+	if (allfds == NULL)
+	{
+		allfds = node;
+	}
+	else
+	{
+		fdNode * ptr = allfds;
+		while(ptr->next != NULL)
+		{
+			ptr = ptr->next;
+		}
+		ptr->next = node;
+	}
 }
 
+int getFreeClientfd()
+{
+	int i = -2;//intial value of client fd;
+	fdNode * ptr = allfds;
+	while(ptr != NULL)
+	{
+		if(ptr->clientfd == i)i--;
+		ptr = ptr->next;
+	}
+	return i;
+}
 
+fdNode * get_Node_from_cfd(int clientfd)
+{
+	fdNode * ptr = allfds;
+	while(ptr->clientfd != clientfd)
+	{
+		ptr = ptr->next;
+	}
+	return ptr;
+}
 
-
-
+void deletefdNode(int clientfd)
+{
+	fdNode * temp = allfds;
+	fdNode * prev = NULL;
+	while(temp != NULL)
+	{
+		if(temp->clientfd == clientfd)
+			{
+				if(temp == allfds)
+				{
+					allfds = allfds->next;
+					free(temp);
+				}
+				else
+				{
+					prev->next = temp->next;
+					free(temp);
+				}
+			}
+		prev = temp;
+		temp = temp->next;
+	}
+}

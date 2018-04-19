@@ -12,14 +12,21 @@ int createSocket();
 
 int main(int argc, char ** argv)
 {
-	if (argc != 2)
+	if (argc != 3)
 	{
-		puts("Error too many input args");
+		puts("Error please input only 1 arguement");
 		exit(0);
 	}
 	else{
-	int file = netopen(argv[1], O_RDONLY);
+	char a[100] = "hello my name is sid";
+	int openType = atoi(argv[2]);
+	int file = netopen(argv[1], O_RDWR);
 	printf("File Descriptor from server:\n%d\n", file);
+	int written = netwrite(file,(void *)&a,256);
+	printf("Bytes written: %d\n",written);
+	int s = netread(file,(void *)&a,10);
+	printf("Bytes Read: %d,%s\n",s,a);
+	int close = netclose(file);	
 	}
 	
 }
@@ -47,29 +54,93 @@ int netopen(char * pathname, int flags)
 	if(num == -1){
 	server_response = strtok(NULL,",");
 	puts(server_response);
+	exit(0);
 	}
 	return num;
 }
 
 int netread(int fd, void * buf, size_t bytes)
 {
-	int serverfd = fd * -1;
+	if(bytes == 0)return 0;
+	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
-
-	char buffer[256] = {0};
 	char server_response[256];
 
 
-
 	client_message[0] = '2';	//specifies netread
-	client_message[1] = ',';
-	sprintf(client_message, "%s,%d", client_message, serverfd);
+	sprintf(client_message, "%s,%d", client_message, clientfd);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
 
-	send(netsocket, client_message, sizeof(client_message), 0);
-	recv(netsocket, buffer, sizeof(buffer), 0);
-	return 0;
+	write(netsocket, client_message, sizeof(client_message));
+	read(netsocket, server_response, sizeof(server_response));
+	
+	char * tok = strtok(server_response, ",");
+    int bytesRead = atoi(tok);
+    tok = strtok(NULL, ",");
+    memset(buf,0,strlen((char *)buf));
+	strcpy((char *)buf,tok);
+	if (bytesRead < 0)
+	{
+		puts(tok);
+		buf = NULL;
+		exit(0);
+	}
+	return bytesRead;
+
+}
+
+int netwrite(int fd, void * buf, size_t bytes)
+{
+	if(bytes == 0)return -1;
+	int clientfd = fd;
+	int netsocket = createSocket();
+	char client_message[256];
+	char server_response[256];
+
+
+	client_message[0] = '4';	//specifies netwrite
+	sprintf(client_message, "%s,%d,", client_message, clientfd);
+	strcat(client_message,(char *)buf);
+	sprintf(client_message, "%s,%d", client_message, (int)bytes);
+	puts(client_message);
+	write(netsocket, client_message, sizeof(client_message));
+	read(netsocket, server_response, sizeof(server_response));
+
+	char * tok = strtok(server_response, ",");
+    int bytesRead = atoi(tok);
+      tok = strtok(NULL, ",");
+    memset(buf,0,strlen((char *)buf));
+	strcpy((char *)buf,tok);
+	if (bytesRead < 0)
+	{
+		puts(tok);
+		buf = NULL;
+		exit(0);
+	}
+}
+
+int netclose(int clientfd)
+{
+	int netsocket = createSocket();
+	char client_message[256];
+	char server_response[256];
+
+
+	client_message[0] = '3';	//specifies netread
+	sprintf(client_message, "%s,%d", client_message, clientfd);
+	write(netsocket, client_message, sizeof(client_message));
+	read(netsocket, server_response, sizeof(server_response));
+
+	char * tok = strtok(server_response, ",");
+    int closeFile = atoi(tok);
+	if (closeFile < 0)
+	{
+		tok = strtok(NULL, ",");
+		puts(tok);
+		exit(0);
+	}
+	return closeFile;
 
 }
 int createSocket()
@@ -97,7 +168,6 @@ int createSocket()
 	puts("Error in socket connection");
 	return -1;
 	}
-
 	return netsocket;
 }
 
