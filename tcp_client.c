@@ -8,7 +8,15 @@
 #include <fcntl.h>
 int netopen(char * pathname, int flags);
 int netread(int fd, void * buf, size_t bytes);
+int netwrite(int fd, void * buf, size_t bytes);
+int netclose(int clientfd);
 int createSocket();
+typedef struct fdNode{
+	int serverfd;
+	int clientfd;
+	struct fdNode * next;
+	int openMode;
+}fdNode;
 
 int main(int argc, char ** argv)
 {
@@ -18,15 +26,13 @@ int main(int argc, char ** argv)
 		exit(0);
 	}
 	else{
-	char a[256] = "hello my name is sid";
+	char a[100] = "hello my name is sid";
 	int openType = atoi(argv[2]);
-	int file = netopen(argv[1], O_RDWR);
-	printf("File Descriptor from server:\n%d\n", file);
-	int written = netwrite(file,(void *)&a,256);
-	printf("Bytes written: %d\n",written);
-	int close = netclose(file);
+	int file = netopen(argv[1], openType);
+	int readFile = netread(file, (void *)&a, sizeof(a));
+	printf("Bytes Read: %d, %s\n", readFile, a);
+	int written = netwrite(file, (void *)&a, sizeof(a));
 	}
-
 }
 
 int netopen(char * pathname, int flags)
@@ -72,7 +78,7 @@ int netread(int fd, void * buf, size_t bytes)
 
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
-
+	
 	char * tok = strtok(server_response, ",");
     int bytesRead = atoi(tok);
     tok = strtok(NULL, ",");
@@ -96,25 +102,23 @@ int netwrite(int fd, void * buf, size_t bytes)
 	char client_message[256];
 	char server_response[256];
 
-
 	sprintf(client_message, "4,%d,",clientfd);
 	strcat(client_message,(char *)buf);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
 	puts(client_message);
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
-    puts(server_response);
+
 	char * tok = strtok(server_response, ",");
-    int bytesRead = atoi(tok);
-    tok = strtok(NULL, ",");
-    memset(buf,0,strlen((char *)buf));
-	strcpy((char *)buf,tok);
-	if (bytesRead < 0)
+    int bytesWritten = atoi(tok);
+	if (bytesWritten < 0)
 	{
+		tok = strtok(NULL, ",");
 		puts(tok);
-		buf = NULL;
 		exit(0);
 	}
+	printf("Successful wrote %d bytes\n",bytesWritten);
+	return bytesWritten;
 }
 
 int netclose(int clientfd)
@@ -144,7 +148,7 @@ int createSocket()
 {
 	//create socket
 	int netsocket;
-
+	
 	netsocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (netsocket == -1)
 	{
