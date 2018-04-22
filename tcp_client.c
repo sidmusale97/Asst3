@@ -6,18 +6,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <netdb.h>
+
 int netopen(char * pathname, int flags);
 int netread(int fd, void * buf, size_t bytes);
-int netwrite(int fd, void * buf, size_t bytes);
-int netclose(int clientfd);
 int createSocket();
-typedef struct fdNode{
-	int serverfd;
-	int clientfd;
-	struct fdNode * next;
-	int openMode;
-}fdNode;
-
+int netserverinit(char * hostname);
+uint32_t serveraddress;
 int main(int argc, char ** argv)
 {
 	if (argc != 3)
@@ -26,35 +21,21 @@ int main(int argc, char ** argv)
 		exit(0);
 	}
 	else{
-	char a[100] = "hello my name is sid";
+	char a[21] = "hello my name is sid";
 	int openType = atoi(argv[2]);
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-	int file = netopen(argv[1], openType);
-	int readFile = netread(file, (void *)&a, sizeof(a));
-	printf("Bytes Read: %d, %s\n", readFile, a);
-	int written = netwrite(file, (void *)&a, sizeof(a));
-=======
-=======
->>>>>>> parent of 8f41ec8... fixed netread
-=======
->>>>>>> parent of 8f41ec8... fixed netread
 	int file = netopen(argv[1], O_RDWR);
 	printf("File Descriptor from server:\n%d\n", file);
-	int written = netwrite(file,(void *)&a,256);
+	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
-	int s = netread(file,(void *)&a,10);
-	printf("Bytes Read: %d,%s\n",s,a);
-	int close = netclose(file);	
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> parent of 8f41ec8... fixed netread
-=======
->>>>>>> parent of 8f41ec8... fixed netread
-=======
->>>>>>> parent of 8f41ec8... fixed netread
+	int file2 = netopen("f.txt", O_RDWR);
+	printf("File Descriptor from server:\n%d\n", file2);
+	char b[21] = {0};
+	int readFile = netread(file2, (void * )&b, 20);
+	puts(b);
+	written = netwrite(file,(void *)&a,20);
+	printf("Bytes written: %d\n",written);
 	}
+	
 }
 
 int netopen(char * pathname, int flags)
@@ -100,11 +81,9 @@ int netread(int fd, void * buf, size_t bytes)
 
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
-	
 	char * tok = strtok(server_response, ",");
     int bytesRead = atoi(tok);
     tok = strtok(NULL, ",");
-    memset(buf,0,strlen((char *)buf));
 	strcpy((char *)buf,tok);
 	if (bytesRead < 0)
 	{
@@ -125,31 +104,21 @@ int netwrite(int fd, void * buf, size_t bytes)
 	char server_response[256];
 
 
-	client_message[0] = '4';	//specifies netwrite
-	sprintf(client_message, "%s,%d,", client_message, clientfd);
+	sprintf(client_message, "4,%d,", clientfd);
 	strcat(client_message,(char *)buf);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
-	puts(client_message);
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
 
 	char * tok = strtok(server_response, ",");
-<<<<<<< HEAD
     int bytesWritten = atoi(tok);
-	if (bytesWritten < 0)
-=======
-    int bytesRead = atoi(tok);
-      tok = strtok(NULL, ",");
-    memset(buf,0,strlen((char *)buf));
-	strcpy((char *)buf,tok);
-	if (bytesRead < 0)
->>>>>>> parent of 8f41ec8... fixed netread
+ 	if (bytesWritten < 0)
 	{
 		tok = strtok(NULL, ",");
 		puts(tok);
+		buf = NULL;
 		exit(0);
 	}
-	printf("Successful wrote %d bytes\n",bytesWritten);
 	return bytesWritten;
 }
 
@@ -202,4 +171,9 @@ int createSocket()
 	return -1;
 	}
 	return netsocket;
+}
+
+int netserverinit(char * hostname){
+	return 0;
+
 }

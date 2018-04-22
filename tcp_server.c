@@ -17,14 +17,16 @@ typedef struct fdNode{
 }fdNode;
 
 
-void echo(int client_socket);
 int createServerSocket();
 void * handleRequest(void * arg);
 void insertfdNode(fdNode * node);
 int getFreeClientfd();
 fdNode * get_Node_from_cfd(int clientfd);
 void deletefdNode(int clientfd);
-
+void handleRead(char * cmessage, int client_socket);
+void handleOpen(char * cmessage, int client_socket);
+void handleWrite(char * cmessage, int client_socket);
+void handleClose(char * cmessage, int client_socket);
 
 fdNode * allfds = NULL;
 	
@@ -73,174 +75,21 @@ void * handleRequest(void * arg)
 	int client_socket = *((int *)arg);
 	pthread_detach(pthread_self());
 	free(arg);
-	echo(client_socket);
-	close(client_socket);
-	return NULL;
-}
-
-void echo(int client_socket)
-{
 	char client_message[256] = {0};
 	char server_message[256] = {0};
 	read(client_socket, &client_message, 256);//receive client socket and client_message
 
 	char dels[2] = ","; //delimeters for strtok
 	char * cmessage = (char *)&client_message; 
-	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
-	int funcID = atoi(tok);  
-	if(funcID == 1){//if netopen
-
-	tok = strtok(NULL, dels);//move on to next parameter which is file path
-	char path[256]; //array to hold file path
-
-	strcpy(path,tok);//copy file path into path array 
-	tok = strtok(NULL, dels);//move to next parameter with is open mode
-	int openMode = atoi(tok);
-	int o;
-	if (openMode == 0) o = O_RDONLY;
-	else if (openMode == 1)o = O_WRONLY;
-	else if (openMode == 2)o = O_RDWR;
-
-	//Attempt to open file
-	int fd = open(path,o);
-	if (fd < 0)
-	{
-		char * errDes = strerror(errno);
-		sprintf(server_message, "%d", fd);
-		strcat(server_message,",Error: ");
-		strcat(server_message,errDes);
-		write(client_socket,server_message, sizeof(server_message));	
-	}
-	else
-	{
-		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
-		newNode->serverfd = fd;
-		newNode->clientfd = getFreeClientfd();
-		newNode->next = NULL;
-		insertfdNode(newNode);
-		sprintf(server_message, "%d",newNode->clientfd);
-		write(client_socket,server_message, sizeof(server_message));
-	}
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-void handleRead(char * cmessage, int client_socket)
-{
-	char server_message[256] = {0};
-	char dels[2] = ","; //delimeters for strtok 
-
-	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
-=======
-	}
-	else if(funcID == 2)
-	{
->>>>>>> parent of 8f41ec8... fixed netread
-=======
-	}
-	else if(funcID == 2)
-	{
->>>>>>> parent of 8f41ec8... fixed netread
-=======
-	}
-	else if(funcID == 2)
-	{
->>>>>>> parent of 8f41ec8... fixed netread
-	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
-	int clientfd = atoi(tok);
-	tok = strtok(NULL, dels);
-	int bytesRequested = atoi(tok);
-
-	fdNode * temp = get_Node_from_cfd(clientfd);
-	int serverfd = temp->serverfd;
-	char buffer[bytesRequested+1];
-
-
-	int readFile = read(serverfd,buffer,bytesRequested);
-	if(readFile < 0)
-	{
-		char * errDes = strerror(errno);
-		sprintf(server_message, "%d", readFile);
-		strcat(server_message,",Error: ");
-		strcat(server_message,errDes);
-		write(client_socket,server_message, sizeof(server_message));
-	}
-	else
-	{	
-		sprintf(server_message,"%d", readFile);
-		strcat(server_message,",");
-		if(readFile == bytesRequested)buffer[bytesRequested] = '\0';
-		else{
-			buffer[readFile] = '\0';
-		}
-		strcat(server_message,buffer);
-		write(client_socket,server_message, sizeof(server_message));
-	}
-	}
-	else if(funcID == 3)
-	{
-		tok = strtok(NULL, dels);//move to next parameter which is clientfd
-		int clientfd = atoi(tok);
-		fdNode * temp = get_Node_from_cfd(clientfd);
-		int serverfd = temp->serverfd;
-		int closeFile = close(serverfd);
-		if (closeFile < 0)
-		{
-		char * errDes = strerror(errno);
-		sprintf(server_message, "%d", closeFile);
-		strcat(server_message,",Error: ");
-		strcat(server_message,errDes);
-		write(client_socket,server_message, sizeof(server_message));
-		}
-		else
-		{
-		deletefdNode(clientfd);
-		sprintf(server_message, "%d", closeFile);
-		write(client_socket,server_message,sizeof(server_message));	
-		}
-	}
-	else if(funcID == 4)
-	{
-	char buffer[256];
-	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
-	int clientfd = atoi(tok);
-	tok = strtok(NULL, dels);
-	strcpy((char *)&buffer,tok);
-	tok = strtok(NULL, dels);
-	int bytesToWrite = atoi(tok);
-
-	fdNode * temp = get_Node_from_cfd(clientfd);
-	int serverfd = temp->serverfd;
-	
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-	int writeFile = write(serverfd,(void *)&buffer,bytesToWrite);
-	if(writeFile < 0)
-=======
-=======
->>>>>>> parent of 8f41ec8... fixed netread
-=======
->>>>>>> parent of 8f41ec8... fixed netread
-
-
-	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
-	if(writeFile != bytesToWrite)
->>>>>>> parent of 8f41ec8... fixed netread
-	{
-		char * errDes = strerror(errno);
-		sprintf(server_message, "%d", -1);
-		strcat(server_message,",Error: ");
-		strcat(server_message,errDes);
-		write(client_socket,server_message, sizeof(server_message));
-	}
-	else
-	{	
-		sprintf(server_message,"%d", writeFile);
-		write(client_socket,server_message, sizeof(server_message));
-	}
+	char funcID = cmessage[0];  
+	if(funcID == '1')handleOpen(cmessage, client_socket);//if netopen
+	else if(funcID == '2')handleRead(cmessage, client_socket); //if netread
+	else if(funcID == '3')handleClose(cmessage,client_socket); //if netclose
+	else if(funcID == '4')handleWrite(cmessage, client_socket); //if netwrite
+	close(client_socket);
+	return NULL;
 }
-}
+
 void insertfdNode(fdNode * node)
 {
 	if (allfds == NULL)
@@ -301,5 +150,138 @@ void deletefdNode(int clientfd)
 			}
 		prev = temp;
 		temp = temp->next;
+	}
+}
+
+void handleOpen(char * cmessage, int client_socket)
+{
+	char server_message[256] = {0};
+
+	char dels[2] = ","; //delimeters for strtok 
+
+	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
+
+	tok = strtok(NULL, dels);//move on to next parameter which is file path
+	char path[256]; //array to hold file path
+
+	strcpy(path,tok);//copy file path into path array 
+	tok = strtok(NULL, dels);//move to next parameter with is open mode
+	int openMode = atoi(tok);
+
+	//Attempt to open file
+	int fd = open(path,openMode);
+	if (fd < 0)
+	{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", fd);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));	
+	}
+	else
+	{
+		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
+		newNode->serverfd = fd;
+		newNode->clientfd = getFreeClientfd();
+		newNode->next = NULL;
+		insertfdNode(newNode);
+		sprintf(server_message, "%d",newNode->clientfd);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+}
+
+void handleRead(char * cmessage, int client_socket){
+	char server_message[256] = {0};
+	char dels[2] = ","; //delimeters for strtok 
+
+	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
+	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
+	int clientfd = atoi(tok);
+	tok = strtok(NULL, dels);
+	int bytesRequested = atoi(tok);
+
+	fdNode * temp = get_Node_from_cfd(clientfd);
+	int serverfd = temp->serverfd;
+	char buffer[bytesRequested+1];
+
+	int readFile = read(serverfd,buffer,bytesRequested);
+	if(readFile < 0)
+	{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", readFile);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+	else
+	{	
+		sprintf(server_message,"%d", readFile);
+		strcat(server_message,",");
+		if(readFile == bytesRequested)buffer[bytesRequested] = '\0';
+		else{
+			buffer[readFile] = '\0';
+		}
+		strcat(server_message,buffer);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+}
+
+void handleClose(char * cmessage, int client_socket)
+{
+	char server_message[256] = {0};
+	char dels[2] = ","; //delimeters for strtok 
+
+	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
+	tok = strtok(NULL, dels);//move to next parameter which is clientfd
+	int clientfd = atoi(tok);
+	fdNode * temp = get_Node_from_cfd(clientfd);
+	int serverfd = temp->serverfd;
+	int closeFile = close(serverfd);
+	if (closeFile < 0)
+		{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", closeFile);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+		}
+	else
+		{
+		deletefdNode(clientfd);
+		sprintf(server_message, "%d", closeFile);
+		write(client_socket,server_message,sizeof(server_message));	
+		}
+}
+
+void handleWrite(char * cmessage, int client_socket)
+{
+	char server_message[256] = {0};
+	char dels[2] = ","; //delimeters for strtok 
+
+	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
+	char buffer[256];
+	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
+	int clientfd = atoi(tok);
+	tok = strtok(NULL, dels);
+	strcpy((char *)&buffer,tok);
+	tok = strtok(NULL, dels);
+	int bytesToWrite = atoi(tok);
+
+	fdNode * temp = get_Node_from_cfd(clientfd);
+	int serverfd = temp->serverfd;
+	
+	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
+	if(writeFile != bytesToWrite)
+	{
+		char * errDes = strerror(errno);
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+	}
+	else
+	{	
+		sprintf(server_message,"%d", writeFile);
+		write(client_socket,server_message, sizeof(server_message));
 	}
 }
