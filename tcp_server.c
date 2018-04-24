@@ -1,20 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#define PORT 8080
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <errno.h>
-#include <pthread.h>
-#include <fcntl.h>
-
-typedef struct fdNode{
-	int serverfd;
-	int clientfd;
-	struct fdNode * next;
-	int openMode;
-}fdNode;
+#include "libnetfiles.h"
 
 
 int createServerSocket();
@@ -183,6 +167,7 @@ void handleOpen(char * cmessage, int client_socket)
 		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
 		newNode->serverfd = fd;
 		newNode->clientfd = getFreeClientfd();
+		newNode->openMode = openMode;
 		newNode->next = NULL;
 		insertfdNode(newNode);
 		sprintf(server_message, "%d",newNode->clientfd);
@@ -215,8 +200,7 @@ void handleRead(char * cmessage, int client_socket){
 	}
 	else
 	{	
-		sprintf(server_message,"%d", readFile);
-		strcat(server_message,",");
+		sprintf(server_message,"%d,", readFile);
 		if(readFile == bytesRequested)buffer[bytesRequested] = '\0';
 		else{
 			buffer[readFile] = '\0';

@@ -1,41 +1,37 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#define PORT 8080
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <fcntl.h>
-#include <netdb.h>
+#include "libnetfiles.h"
 
-int netopen(char * pathname, int flags);
-int netread(int fd, void * buf, size_t bytes);
 int createSocket();
-int netserverinit(char * hostname);
-uint32_t serveraddress;
+
+//struct in_addr * serveraddress;
+char * sip[100] = {0};
 int main(int argc, char ** argv)
 {
-	if (argc != 3)
-	{
-		puts("Error please input only 1 arguement");
-		exit(0);
-	}
-	else{
+	//int sn = netserverinit("cp.cs.rutgers.edu");
+	//if(sn == -1)
+	//{
+	//	exit(0);
+	//}	
+
 	char a[21] = "hello my name is sid";
-	int openType = atoi(argv[2]);
-	int file = netopen(argv[1], O_RDWR);
+	int openType = O_RDWR;
+	int file = netopen(argv[1], openType);
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
-	int file2 = netopen("f.txt", O_RDWR);
+	int closeFile = netclose(file);
+	printf("File closed: %d\n", closeFile);
+	int file2 = netopen("A.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file2);
 	char b[21] = {0};
-	int readFile = netread(file2, (void * )&b, 20);
-	puts(b);
-	written = netwrite(file,(void *)&a,20);
-	printf("Bytes written: %d\n",written);
+	int readFile;
+	while((readFile = netread(file2, (void * )&b, 5)) > 0)
+	{
+	if(b != NULL)
+		{
+			puts(b);
+		}
 	}
-	
+	return 0;
 }
 
 int netopen(char * pathname, int flags)
@@ -91,6 +87,7 @@ int netread(int fd, void * buf, size_t bytes)
 		buf = NULL;
 		exit(0);
 	}
+	if(bytesRead == 0)buf = NULL;
 	return bytesRead;
 
 }
@@ -173,7 +170,20 @@ int createSocket()
 	return netsocket;
 }
 
-int netserverinit(char * hostname){
+ int netserverinit(char * hostname, int filemode){
+	struct hostent * serverinfo;
+	if ((serverinfo = gethostbyname(hostname)) == NULL)
+	{
+		herror("Error");
+		return -1;
+	}
+	else
+	{
+		//char * temp = (char *)malloc(serverinfo->h_length);
+		strcpy((char *)&sip, serverinfo->h_addr);
+		puts((char *)&sip);
+		//serveraddress = (struct in_addr *)temp;
+	}
 	return 0;
 
 }
