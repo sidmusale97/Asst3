@@ -130,7 +130,7 @@ int netwrite(int fd, void * buf, size_t bytes)
 
 int netclose(int clientfd)
 {
-	if(fd == -1)
+	if(clientfd == -1)
 	{
 		puts("Error: Bad File Descriptor");
 		exit(0);
