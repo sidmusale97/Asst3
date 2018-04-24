@@ -3,7 +3,7 @@
 int createSocket();
 
 //struct in_addr * serveraddress;
-char * sip[100] = {0};
+struct in_addr * saddress;
 int main(int argc, char ** argv)
 {
 	//int sn = netserverinit("cp.cs.rutgers.edu");
@@ -43,12 +43,11 @@ int netopen(char * pathname, int flags)
 		return -1;
 	}
 	char buffer[256] = {0};
-
-
 	buffer[0] = '1';	//specifies netopen
 	strcat(buffer,",");
 	strcat(buffer,pathname);
 	sprintf(buffer,"%s,%d",buffer,flags);
+	sprintf(buffer,"%s,%d",buffer,FileMode);
 	write(netsocket,buffer, sizeof(buffer));
 	memset(buffer,0,sizeof(buffer));
 	read(netsocket, buffer, sizeof(buffer));
@@ -65,6 +64,11 @@ int netopen(char * pathname, int flags)
 int netread(int fd, void * buf, size_t bytes)
 {
 	if(bytes == 0)return 0;
+	else if(fd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		exit(0);
+	}
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
@@ -95,6 +99,11 @@ int netread(int fd, void * buf, size_t bytes)
 int netwrite(int fd, void * buf, size_t bytes)
 {
 	if(bytes == 0)return -1;
+	else if(fd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		return -1;
+	}
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
@@ -121,6 +130,11 @@ int netwrite(int fd, void * buf, size_t bytes)
 
 int netclose(int clientfd)
 {
+	if(fd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		exit(0);
+	}
 	int netsocket = createSocket();
 	char client_message[256];
 	char server_response[256];
@@ -172,18 +186,15 @@ int createSocket()
 
  int netserverinit(char * hostname, int filemode){
 	struct hostent * serverinfo;
-	if ((serverinfo = gethostbyname(hostname)) == NULL)
+	FileMode = filemode;
+	if((serverinfo = gethostbyname(hostname)) == NULL)
 	{
 		herror("Error");
 		return -1;
 	}
-	else
-	{
-		//char * temp = (char *)malloc(serverinfo->h_length);
-		strcpy((char *)&sip, serverinfo->h_addr);
-		puts((char *)&sip);
-		//serveraddress = (struct in_addr *)temp;
-	}
+	char * temp = (char *)malloc(serverinfo->h_length);
+	strcpy(temp, serverinfo->h_addr);
+	saddress = (struct in_addr *)temp;
 	return 0;
 
 }
