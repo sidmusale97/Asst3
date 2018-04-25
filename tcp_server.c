@@ -6,11 +6,14 @@ void * handleRequest(void * arg);
 void insertfdNode(fdNode * node);
 int getFreeClientfd();
 fdNode * get_Node_from_cfd(int clientfd);
+fdNode * get_Nodes_from_path(char * path, fdNode * start);
 void deletefdNode(int clientfd);
 void handleRead(char * cmessage, int client_socket);
 void handleOpen(char * cmessage, int client_socket);
 void handleWrite(char * cmessage, int client_socket);
 void handleClose(char * cmessage, int client_socket);
+
+pthread_mutex_t mutex;
 
 fdNode * allfds = NULL;
 	
@@ -19,15 +22,15 @@ int main()
 	int server_socket = createServerSocket();
 	int * client_socket;
 	pthread_t tid;
-
+	
+	pthread_mutex_init(&mutex, NULL);
 	while (1)
 	{
 	client_socket = (int *)malloc(sizeof(int));
 	*client_socket = accept(server_socket, NULL, NULL);
 	pthread_create(&tid,NULL,handleRequest,client_socket);
 	}
-
-return 0;
+	return 0;
 }
 
 int createServerSocket()
@@ -106,13 +109,23 @@ int getFreeClientfd()
 fdNode * get_Node_from_cfd(int clientfd)
 {
 	fdNode * ptr = allfds;
-	while(ptr->clientfd != clientfd)
+	if (allfds == NULL)return NULL; 
+	while((ptr->clientfd != clientfd)  && ptr != NULL)
 	{
 		ptr = ptr->next;
 	}
 	return ptr;
 }
 
+	fdNode * get_Nodes_from_path(char * path, fdNode * start){
+	fdNode * ptr = start;
+	if (start == NULL)return NULL;
+	while((strcmp(path,ptr->path) != 0) && ptr != NULL)
+	{
+		ptr = ptr->next;
+	}
+	return ptr;
+}
 void deletefdNode(int clientfd)
 {
 	fdNode * temp = allfds;
@@ -124,11 +137,13 @@ void deletefdNode(int clientfd)
 				if(temp == allfds)
 				{
 					allfds = allfds->next;
+					free(temp->path);
 					free(temp);
 				}
 				else
 				{
 					prev->next = temp->next;
+					free(temp->path);
 					free(temp);
 				}
 			}
@@ -146,12 +161,14 @@ void handleOpen(char * cmessage, int client_socket)
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
 
 	tok = strtok(NULL, dels);//move on to next parameter which is file path
-	char path[256]; //array to hold file path
+	char * path = (char *)malloc(256); //array to hold file path
 
 	strcpy(path,tok);//copy file path into path array 
 	tok = strtok(NULL, dels);//move to next parameter with is open mode
 	int openMode = atoi(tok);
 
+	tok = strtok(NULL, dels);//move to next parameter with is file mode
+	int fileMode = atoi(tok);
 	//Attempt to open file
 	int fd = open(path,openMode);
 	if (fd < 0)
@@ -164,12 +181,42 @@ void handleOpen(char * cmessage, int client_socket)
 	}
 	else
 	{
+		fdNode * temp = get_Nodes_from_path(path,allfds);
+		strcat(server_message,path);
+		sprintf(server_message,"%s,clientfd: %d,fileMode: %d,openMode: %d", server_message, temp->clientfd,temp->fileMode, temp->openMode);
+		write(client_socket,server_message, sizeof(server_message));
+		if (1)return;
+		if (fileMode == 2 &&  temp != NULL);//if transaction mode and file is opened in another client
+		{
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: Invalid permission in transcation mode. File is opened in another client");
+		write(client_socket,server_message, sizeof(server_message));
+		return;	
+		}
+		if(fileMode == 1 && temp != NULL)
+		{
+			while(temp != NULL)
+			{
+				if(temp->openMode == O_WRONLY || temp->openMode == O_RDWR)
+				{
+					sprintf(server_message, "%d", -1);
+					strcat(server_message,",Error: Invalid permission in exclusive mode. File is opened with write permission in another client");
+					write(client_socket,server_message, sizeof(server_message));
+					return;
+				}
+				temp = get_Nodes_from_path(path,temp->next);
+			}
+		}	
 		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
+		newNode->path = path;
+		newNode->fileMode = fileMode;
 		newNode->serverfd = fd;
 		newNode->clientfd = getFreeClientfd();
 		newNode->openMode = openMode;
 		newNode->next = NULL;
+		pthread_mutex_lock(&mutex);
 		insertfdNode(newNode);
+		pthread_mutex_unlock(&mutex);
 		sprintf(server_message, "%d",newNode->clientfd);
 		write(client_socket,server_message, sizeof(server_message));
 	}
@@ -186,6 +233,12 @@ void handleRead(char * cmessage, int client_socket){
 	int bytesRequested = atoi(tok);
 
 	fdNode * temp = get_Node_from_cfd(clientfd);
+	if (temp == NULL)
+	{
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: Bad File Descriptor");
+		write(client_socket,server_message, sizeof(server_message));
+	}
 	int serverfd = temp->serverfd;
 	char buffer[bytesRequested+1];
 
@@ -219,6 +272,12 @@ void handleClose(char * cmessage, int client_socket)
 	tok = strtok(NULL, dels);//move to next parameter which is clientfd
 	int clientfd = atoi(tok);
 	fdNode * temp = get_Node_from_cfd(clientfd);
+	if (temp == NULL)
+	{
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: Bad File Descriptor");
+		write(client_socket,server_message, sizeof(server_message));
+	}
 	int serverfd = temp->serverfd;
 	int closeFile = close(serverfd);
 	if (closeFile < 0)
@@ -231,7 +290,9 @@ void handleClose(char * cmessage, int client_socket)
 		}
 	else
 		{
+		pthread_mutex_lock(&mutex);
 		deletefdNode(clientfd);
+		pthread_mutex_unlock(&mutex);
 		sprintf(server_message, "%d", closeFile);
 		write(client_socket,server_message,sizeof(server_message));	
 		}
@@ -249,12 +310,21 @@ void handleWrite(char * cmessage, int client_socket)
 	tok = strtok(NULL, dels);
 	strcpy((char *)&buffer,tok);
 	tok = strtok(NULL, dels);
+
 	int bytesToWrite = atoi(tok);
 
 	fdNode * temp = get_Node_from_cfd(clientfd);
+	if (temp == NULL)
+	{
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: Bad File Descriptor");
+		write(client_socket,server_message, sizeof(server_message));
+	}
 	int serverfd = temp->serverfd;
 	
+	pthread_mutex_lock(&mutex); //if unrestricted mode lock to prevent race condition
 	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
+	pthread_mutex_unlock(&mutex);
 	if(writeFile != bytesToWrite)
 	{
 		char * errDes = strerror(errno);

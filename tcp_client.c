@@ -3,7 +3,7 @@
 int createSocket();
 
 //struct in_addr * serveraddress;
-char * sip[100] = {0};
+struct in_addr * saddress;
 int main(int argc, char ** argv)
 {
 	//int sn = netserverinit("cp.cs.rutgers.edu");
@@ -13,24 +13,27 @@ int main(int argc, char ** argv)
 	//}	
 
 	char a[21] = "hello my name is sid";
+	char b[50] = {0};
 	int openType = O_RDWR;
-	int file = netopen(argv[1], openType);
+	int file = netopen("A.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
-	int closeFile = netclose(file);
-	printf("File closed: %d\n", closeFile);
+	//int closeFile = netclose(file);
+	//printf("File closed: %d\n", closeFile);
 	int file2 = netopen("A.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file2);
-	char b[21] = {0};
+	int readFile = netread(file2, b, 50);
+	/*
 	int readFile;
 	while((readFile = netread(file2, (void * )&b, 5)) > 0)
 	{
-	if(b != NULL)
+	if(*b != NULL)
 		{
 			puts(b);
 		}
 	}
+	*/
 	return 0;
 }
 
@@ -43,15 +46,15 @@ int netopen(char * pathname, int flags)
 		return -1;
 	}
 	char buffer[256] = {0};
-
-
 	buffer[0] = '1';	//specifies netopen
 	strcat(buffer,",");
 	strcat(buffer,pathname);
 	sprintf(buffer,"%s,%d",buffer,flags);
+	sprintf(buffer,"%s,%d",buffer,FileMode);
 	write(netsocket,buffer, sizeof(buffer));
 	memset(buffer,0,sizeof(buffer));
 	read(netsocket, buffer, sizeof(buffer));
+	puts((char *)&buffer);
 	char * server_response = strtok(buffer,",");
 	int num = atoi(server_response);
 	if(num == -1){
@@ -65,6 +68,11 @@ int netopen(char * pathname, int flags)
 int netread(int fd, void * buf, size_t bytes)
 {
 	if(bytes == 0)return 0;
+	else if(fd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		exit(0);
+	}
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
@@ -77,6 +85,7 @@ int netread(int fd, void * buf, size_t bytes)
 
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
+	puts((char *)&server_response);
 	char * tok = strtok(server_response, ",");
     int bytesRead = atoi(tok);
     tok = strtok(NULL, ",");
@@ -95,6 +104,11 @@ int netread(int fd, void * buf, size_t bytes)
 int netwrite(int fd, void * buf, size_t bytes)
 {
 	if(bytes == 0)return -1;
+	else if(fd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		return -1;
+	}
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
@@ -121,6 +135,11 @@ int netwrite(int fd, void * buf, size_t bytes)
 
 int netclose(int clientfd)
 {
+	if(clientfd == -1)
+	{
+		puts("Error: Bad File Descriptor");
+		exit(0);
+	}
 	int netsocket = createSocket();
 	char client_message[256];
 	char server_response[256];
@@ -172,18 +191,15 @@ int createSocket()
 
  int netserverinit(char * hostname, int filemode){
 	struct hostent * serverinfo;
-	if ((serverinfo = gethostbyname(hostname)) == NULL)
+	FileMode = filemode;
+	if((serverinfo = gethostbyname(hostname)) == NULL)
 	{
 		herror("Error");
 		return -1;
 	}
-	else
-	{
-		//char * temp = (char *)malloc(serverinfo->h_length);
-		strcpy((char *)&sip, serverinfo->h_addr);
-		puts((char *)&sip);
-		//serveraddress = (struct in_addr *)temp;
-	}
+	char * temp = (char *)malloc(serverinfo->h_length);
+	strcpy(temp, serverinfo->h_addr);
+	saddress = (struct in_addr *)temp;
 	return 0;
 
 }
