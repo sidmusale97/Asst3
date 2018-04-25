@@ -109,6 +109,7 @@ int getFreeClientfd()
 fdNode * get_Node_from_cfd(int clientfd)
 {
 	fdNode * ptr = allfds;
+	if (allfds == NULL)return NULL; 
 	while((ptr->clientfd != clientfd)  && ptr != NULL)
 	{
 		ptr = ptr->next;
@@ -116,8 +117,9 @@ fdNode * get_Node_from_cfd(int clientfd)
 	return ptr;
 }
 
-fdNode * get_Nodes_from_path(char * path, fdNode * start){
+	fdNode * get_Nodes_from_path(char * path, fdNode * start){
 	fdNode * ptr = start;
+	if (start == NULL)return NULL;
 	while((strcmp(path,ptr->path) != 0) && ptr != NULL)
 	{
 		ptr = ptr->next;
@@ -179,7 +181,32 @@ void handleOpen(char * cmessage, int client_socket)
 	}
 	else
 	{
-
+		fdNode * temp = get_Nodes_from_path(path,allfds);
+		strcat(server_message,path);
+		sprintf(server_message,"%s,clientfd: %d,fileMode: %d,openMode: %d", server_message, temp->clientfd,temp->fileMode, temp->openMode);
+		write(client_socket,server_message, sizeof(server_message));
+		if (1)return;
+		if (fileMode == 2 &&  temp != NULL);//if transaction mode and file is opened in another client
+		{
+		sprintf(server_message, "%d", -1);
+		strcat(server_message,",Error: Invalid permission in transcation mode. File is opened in another client");
+		write(client_socket,server_message, sizeof(server_message));
+		return;	
+		}
+		if(fileMode == 1 && temp != NULL)
+		{
+			while(temp != NULL)
+			{
+				if(temp->openMode == O_WRONLY || temp->openMode == O_RDWR)
+				{
+					sprintf(server_message, "%d", -1);
+					strcat(server_message,",Error: Invalid permission in exclusive mode. File is opened with write permission in another client");
+					write(client_socket,server_message, sizeof(server_message));
+					return;
+				}
+				temp = get_Nodes_from_path(path,temp->next);
+			}
+		}	
 		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
 		newNode->path = path;
 		newNode->fileMode = fileMode;
@@ -295,7 +322,7 @@ void handleWrite(char * cmessage, int client_socket)
 	}
 	int serverfd = temp->serverfd;
 	
-	if(temp->fileMode == 0)pthread_mutex_lock(&mutex);
+	pthread_mutex_lock(&mutex); //if unrestricted mode lock to prevent race condition
 	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
 	pthread_mutex_unlock(&mutex);
 	if(writeFile != bytesToWrite)

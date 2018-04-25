@@ -13,24 +13,27 @@ int main(int argc, char ** argv)
 	//}	
 
 	char a[21] = "hello my name is sid";
+	char b[50] = {0};
 	int openType = O_RDWR;
-	int file = netopen(argv[1], openType);
+	int file = netopen("A.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
-	int closeFile = netclose(file);
-	printf("File closed: %d\n", closeFile);
+	//int closeFile = netclose(file);
+	//printf("File closed: %d\n", closeFile);
 	int file2 = netopen("A.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file2);
-	char b[21] = {0};
+	int readFile = netread(file2, b, 50);
+	/*
 	int readFile;
 	while((readFile = netread(file2, (void * )&b, 5)) > 0)
 	{
-	if(b != NULL)
+	if(*b != NULL)
 		{
 			puts(b);
 		}
 	}
+	*/
 	return 0;
 }
 
@@ -51,6 +54,7 @@ int netopen(char * pathname, int flags)
 	write(netsocket,buffer, sizeof(buffer));
 	memset(buffer,0,sizeof(buffer));
 	read(netsocket, buffer, sizeof(buffer));
+	puts((char *)&buffer);
 	char * server_response = strtok(buffer,",");
 	int num = atoi(server_response);
 	if(num == -1){
@@ -81,6 +85,7 @@ int netread(int fd, void * buf, size_t bytes)
 
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
+	puts((char *)&server_response);
 	char * tok = strtok(server_response, ",");
     int bytesRead = atoi(tok);
     tok = strtok(NULL, ",");
