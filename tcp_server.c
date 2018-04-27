@@ -14,7 +14,7 @@ void handleWrite(char * cmessage, int client_socket);
 void handleClose(char * cmessage, int client_socket);
 
 pthread_mutex_t mutex;
-
+sem_t socketsemaphore;
 fdNode * allfds = NULL;
 	
 int main()
@@ -30,6 +30,8 @@ int main()
 	*client_socket = accept(server_socket, NULL, NULL);
 	pthread_create(&tid,NULL,handleRequest,client_socket);
 	}
+
+	pthread_mutex_destroy(&mutex);
 	return 0;
 }
 
@@ -157,7 +159,7 @@ void handleOpen(char * cmessage, int client_socket)
 	char server_message[256] = {0};
 
 	char dels[2] = ","; //delimeters for strtok 
-
+	puts(cmessage);
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
 
 	tok = strtok(NULL, dels);//move on to next parameter which is file path
@@ -169,6 +171,7 @@ void handleOpen(char * cmessage, int client_socket)
 
 	tok = strtok(NULL, dels);//move to next parameter with is file mode
 	int fileMode = atoi(tok);
+	printf("%d\n", fileMode);
 	//Attempt to open file
 	int fd = open(path,openMode);
 	if (fd < 0)
@@ -182,10 +185,6 @@ void handleOpen(char * cmessage, int client_socket)
 	else
 	{
 		fdNode * temp = get_Nodes_from_path(path,allfds);
-		strcat(server_message,path);
-		sprintf(server_message,"%s,clientfd: %d,fileMode: %d,openMode: %d", server_message, temp->clientfd,temp->fileMode, temp->openMode);
-		write(client_socket,server_message, sizeof(server_message));
-		if (1)return;
 		if (fileMode == 2 &&  temp != NULL);//if transaction mode and file is opened in another client
 		{
 		sprintf(server_message, "%d", -1);
