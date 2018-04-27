@@ -25,4 +25,4 @@ int netread(int fd, void * buf, size_t bytes);
 int netwrite(int fd, void * buf, size_t bytes);
 int netclose(int clientfd);
 int netserverinit(char * hostname, int filemode);
-int FileMode = 2;
+int FileMode = 0;

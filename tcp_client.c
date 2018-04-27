@@ -11,7 +11,6 @@ int main(int argc, char ** argv)
 	//{
 	//	exit(0);
 	//}	
-
 	char a[21] = "hello my name is sid";
 	char b[50] = {0};
 	int openType = O_RDWR;
@@ -19,6 +18,7 @@ int main(int argc, char ** argv)
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
+	written = netwrite(file,(void *)&a,20);
 	//int closeFile = netclose(file);
 	//printf("File closed: %d\n", closeFile);
 	int file2 = netopen("A.txt", openType);
@@ -54,7 +54,6 @@ int netopen(char * pathname, int flags)
 	write(netsocket,buffer, sizeof(buffer));
 	memset(buffer,0,sizeof(buffer));
 	read(netsocket, buffer, sizeof(buffer));
-	puts((char *)&buffer);
 	char * server_response = strtok(buffer,",");
 	int num = atoi(server_response);
 	if(num == -1){
@@ -76,27 +75,36 @@ int netread(int fd, void * buf, size_t bytes)
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
-	char server_response[256];
+
+	char * server_response;
+
+	if(bytes > 50)server_response = (char *)malloc(bytes);
+	else server_response = (char *)malloc(50);
+	 
 
 
 	client_message[0] = '2';	//specifies netread
-	sprintf(client_message, "%s,%d", client_message, clientfd);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
-
+	sprintf(client_message, "%s,%d", client_message, clientfd);
+	
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
-	puts((char *)&server_response);
 	char * tok = strtok(server_response, ",");
     int bytesRead = atoi(tok);
+    if(bytesRead == 0)
+    	{
+    		buf = NULL;
+    		return 0;
     tok = strtok(NULL, ",");
 	strcpy((char *)buf,tok);
+	free(server_response);
 	if (bytesRead < 0)
 	{
 		puts(tok);
 		buf = NULL;
 		exit(0);
 	}
-	if(bytesRead == 0)buf = NULL;
+	
 	return bytesRead;
 
 }
@@ -111,18 +119,19 @@ int netwrite(int fd, void * buf, size_t bytes)
 	}
 	int clientfd = fd;
 	int netsocket = createSocket();
-	char client_message[256];
+	char * client_message = (char *)malloc(bytes + 10);
 	char server_response[256];
 
 
 	sprintf(client_message, "4,%d,", clientfd);
-	strcat(client_message,(char *)buf);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
+	strcat(client_message,(char *)buf);
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
 
 	char * tok = strtok(server_response, ",");
     int bytesWritten = atoi(tok);
+    free(client_message);
  	if (bytesWritten < 0)
 	{
 		tok = strtok(NULL, ",");
