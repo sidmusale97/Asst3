@@ -12,6 +12,7 @@ void handleRead(char * cmessage, int client_socket);
 void handleOpen(char * cmessage, int client_socket);
 void handleWrite(char * cmessage, int client_socket);
 void handleClose(char * cmessage, int client_socket);
+void cleanLL();
 
 pthread_mutex_t mutex;
 sem_t socketsemaphore;
@@ -31,7 +32,7 @@ int main()
 	*client_socket = accept(server_socket, NULL, NULL);
 	pthread_create(&tid,NULL,handleRequest,client_socket);
 	}
-
+	cleanLL();
 	pthread_mutex_destroy(&mutex);
 	return 0;
 }
@@ -66,28 +67,16 @@ void * handleRequest(void * arg)
 	int client_socket = *((int *)arg);
 	pthread_detach(pthread_self());
 	free(arg);
-	char client_message[256] = {0};
+	char client_message[4000] = {0};
 	char server_message[256] = {0};
-	read(client_socket, &client_message, 256);//receive client socket and client_message
-
+	read(client_socket, &client_message, 4000);//receive client socket and client_message
 	char dels[2] = ","; //delimeters for strtok
 	char * cmessage = (char *)&client_message; 
 	char funcID = cmessage[0];  
 	if(funcID == '1')handleOpen(cmessage, client_socket);//if netopen
 	else if(funcID == '2')handleRead(cmessage, client_socket); //if netread
 	else if(funcID == '3')handleClose(cmessage,client_socket); //if netclose
-	else if(funcID == '4')
-	{
-	int i =2;
-	char numBytes[10];
-	while(isdigit(client_message[i]))
-	{
-		numBytes[i] = client_message[i];
-	}
-	int bytes = atoi((char *)&numBytes);
-	char * message = (char * )malloc()
-	handleWrite(cmessage, client_socket); //if netwrite
-	}	
+	else if(funcID == '4')handleWrite(cmessage, client_socket); //if netwrite	
 	close(client_socket);
 	sem_post(&socketsemaphore);
 	return NULL;
@@ -155,12 +144,14 @@ void deletefdNode(int clientfd)
 					allfds = allfds->next;
 					free(temp->path);
 					free(temp);
+					return;
 				}
 				else
 				{
 					prev->next = temp->next;
 					free(temp->path);
 					free(temp);
+					return;
 				}
 			}
 		prev = temp;
@@ -171,7 +162,6 @@ void deletefdNode(int clientfd)
 void handleOpen(char * cmessage, int client_socket)
 {
 	char server_message[256] = {0};
-
 	char dels[2] = ","; //delimeters for strtok 
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
 
@@ -184,7 +174,6 @@ void handleOpen(char * cmessage, int client_socket)
 
 	tok = strtok(NULL, dels);//move to next parameter with is file mode
 	int fileMode = atoi(tok);
-	printf("%d\n", fileMode);
 	//Attempt to open file
 	int fd = open(path,openMode);
 	if (fd < 0)
@@ -198,7 +187,7 @@ void handleOpen(char * cmessage, int client_socket)
 	else
 	{
 		fdNode * temp = get_Nodes_from_path(path,allfds);
-		if (fileMode == 2 &&  temp != NULL);//if transaction mode and file is opened in another client
+		if (fileMode == 2 &&  temp != NULL)//if transaction mode and file is opened in another client
 		{
 		sprintf(server_message, "%d", -1);
 		strcat(server_message,",Error: Invalid permission in transcation mode. File is opened in another client");
@@ -240,10 +229,9 @@ void handleRead(char * cmessage, int client_socket){
 
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
 	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
-	int clientfd = atoi(tok);
-	tok = strtok(NULL, dels);
 	int bytesRequested = atoi(tok);
-
+	tok = strtok(NULL, dels);
+	int clientfd = atoi(tok);
 	fdNode * temp = get_Node_from_cfd(clientfd);
 	if (temp == NULL)
 	{
@@ -314,16 +302,14 @@ void handleWrite(char * cmessage, int client_socket)
 {
 	char server_message[256] = {0};
 	char dels[2] = ","; //delimeters for strtok 
-
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
 	char buffer[256];
 	tok = strtok(NULL, dels);//move on to next parameter which is clientfd
 	int clientfd = atoi(tok);
 	tok = strtok(NULL, dels);
-	strcpy((char *)&buffer,tok);
-	tok = strtok(NULL, dels);
-
 	int bytesToWrite = atoi(tok);
+	tok = strtok(NULL, dels);
+	strcpy((char *)&buffer,tok);
 
 	fdNode * temp = get_Node_from_cfd(clientfd);
 	if (temp == NULL)
@@ -333,7 +319,6 @@ void handleWrite(char * cmessage, int client_socket)
 		write(client_socket,server_message, sizeof(server_message));
 	}
 	int serverfd = temp->serverfd;
-	
 	pthread_mutex_lock(&mutex); //if unrestricted mode lock to prevent race condition
 	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
 	pthread_mutex_unlock(&mutex);
@@ -349,5 +334,18 @@ void handleWrite(char * cmessage, int client_socket)
 	{	
 		sprintf(server_message,"%d", writeFile);
 		write(client_socket,server_message, sizeof(server_message));
+	}
+}
+
+void cleanLL()
+{	
+	fdNode * temp = allfds;
+	fdNode * next = allfds->next;
+	while(temp != NULL)
+	{
+		close(temp->serverfd);
+		free(temp->path);
+		free(temp);	
+		temp = next;
 	}
 }
