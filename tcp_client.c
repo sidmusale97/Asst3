@@ -75,13 +75,18 @@ int netread(int fd, void * buf, size_t bytes)
 	int clientfd = fd;
 	int netsocket = createSocket();
 	char client_message[256];
-	char server_response[bytes];
+
+	char * server_response;
+
+	if(bytes > 50)server_response = (char *)malloc(bytes);
+	else server_response = (char *)malloc(50);
+	 
 
 
 	client_message[0] = '2';	//specifies netread
-	sprintf(client_message, "%s,%d", client_message, clientfd);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
-
+	sprintf(client_message, "%s,%d", client_message, clientfd);
+	
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
 	char * tok = strtok(server_response, ",");
@@ -92,6 +97,7 @@ int netread(int fd, void * buf, size_t bytes)
     		return 0;
     tok = strtok(NULL, ",");
 	strcpy((char *)buf,tok);
+	free(server_response);
 	if (bytesRead < 0)
 	{
 		puts(tok);
@@ -113,18 +119,18 @@ int netwrite(int fd, void * buf, size_t bytes)
 	}
 	int clientfd = fd;
 	int netsocket = createSocket();
-	char client_message[256];
 	char server_response[256];
 
 
 	sprintf(client_message, "4,%d,", clientfd);
-	strcat(client_message,(char *)buf);
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
+	strcat(client_message,(char *)buf);
 	write(netsocket, client_message, sizeof(client_message));
 	read(netsocket, server_response, sizeof(server_response));
 
 	char * tok = strtok(server_response, ",");
     int bytesWritten = atoi(tok);
+    free(client_message);
  	if (bytesWritten < 0)
 	{
 		tok = strtok(NULL, ",");
