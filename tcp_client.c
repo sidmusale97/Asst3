@@ -119,6 +119,7 @@ int netwrite(int fd, void * buf, size_t bytes)
 	}
 	int clientfd = fd;
 	int netsocket = createSocket();
+	char * client_message = (char *)malloc(bytes + 10);
 	char server_response[256];
 
 
