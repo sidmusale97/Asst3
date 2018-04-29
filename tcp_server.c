@@ -187,7 +187,7 @@ void handleOpen(char * cmessage, int client_socket)
 	else
 	{
 		fdNode * temp = get_Nodes_from_path(path,allfds);
-		if (fileMode == 2 &&  temp != NULL)//if transaction mode and file is opened in another client
+		if ((fileMode == 2 &&  temp != NULL) || (temp->fileMode == 2))//if transaction mode and file is opened in another client
 		{
 		sprintf(server_message, "%d", -1);
 		strcat(server_message,",Error: Invalid permission in transcation mode. File is opened in another client");
