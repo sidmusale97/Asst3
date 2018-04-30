@@ -10,6 +10,10 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <semaphore.h>
+#include <sys/time.h>
+#define UNRESTRICTED 0
+#define EXCLUSIVE 1
+#define TRANSACTION 2
 
 typedef struct fdNode{
 	char * path;
@@ -18,11 +22,24 @@ typedef struct fdNode{
 	int clientfd;
 	int openMode;
 	struct fdNode * next;
+
 }fdNode;
 
+typedef struct QueueNode 
+{
+	int valid;
+	time_t secs;
+	pthread_t tid;
+	char * path;
+	int openMode;
+	int fileMode;
+	int ready;
+	struct QueueNode * next;
+}QueueNode;
+
 int netopen(char * pathname, int flags);
-int netread(int fd, void * buf, size_t bytes);
+int netread(int fd, void * buf, int bytes);
 int netwrite(int fd, void * buf, size_t bytes);
 int netclose(int clientfd);
 int netserverinit(char * hostname, int filemode);
-int FileMode = 0;
+int FileMode;
