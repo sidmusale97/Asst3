@@ -190,22 +190,35 @@ int createSocket()
 
  int netserverinit(char * hostname, int filemode){
 	struct hostent * serverinfo;
+	 struct sockaddr_in saddress;
  if(filemode > 2)
  {
  puts("Error: Invalid File Mode");
  exit(0);
  }
 	FileMode = filemode;
-  
+  	int sockfd = createSocket();
+	if(sockfd<0){
+		herror("Error creating socket");
+	}
+	 
 	if((serverinfo = gethostbyname(hostname)) == NULL)
 	{
 		h_errno = HOST_NOT_FOUND;
 		herror("Error");
 		return -1;
 	}
-	char * temp = (char *)malloc(serverinfo->h_length);
-	strcpy(temp, serverinfo->h_addr);
-	saddress = (struct in_addr *)temp;
+	 bzero((char*) &saddress, sizeof(saddress));
+	 saddress.sin_family = AF_INET;
+	 bcopy((char*) serverinfo->h_addr, (char*) &saddress.sin_addr.s_addr, serverinfo->h_length));
+	 saddress.sin_port = htons(portno);
+	 
+	 int connection = connect(sockfd, (struct sockaddr*) &saddress, sizeof(saddress))<0);
+	 if(connection <0){
+		 herror("Connection Error");
+		 exit(0);
+	 }	 
+	
 	return 0;
 
 }
