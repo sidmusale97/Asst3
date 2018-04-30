@@ -18,7 +18,7 @@ int main(int argc, char ** argv)
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
-	written = netwrite(file,(void *)&a,20);
+	//int closeFile = netclose(file);
 	//printf("File closed: %d\n", closeFile);
 	int file2 = netopen("hey.txt", openType);
 	printf("File Descriptor from server:\n%d\n", file2);
@@ -46,7 +46,13 @@ int netopen(char * pathname, int flags)
 	read(netsocket, buffer, sizeof(buffer));
 	char * server_response = strtok(buffer,",");
 	int num = atoi(server_response);
-	if(num == -1){
+	if (num == ETIMEDOUT)
+	{
+		errno = ETIMEDOUT;
+		perror("Error");
+		return -1;
+	}
+	else if(num == -1){
 	server_response = strtok(NULL,",");
 	puts(server_response);
 	exit(0);
@@ -54,7 +60,7 @@ int netopen(char * pathname, int flags)
 	return num;
 }
 
-int netread(int fd, void * buf, size_t bytes)
+int netread(int fd, void * buf, int bytes)
 {
 	if(bytes == 0)return 0;
 	else if(fd == -1)
@@ -66,7 +72,7 @@ int netread(int fd, void * buf, size_t bytes)
 	int netsocket = createSocket();
 	char client_message[256];
 
-	char server_response[4000];
+	char server_response[256];
 	
 	client_message[0] = '2';	//specifies netread
 	sprintf(client_message, "%s,%d", client_message, (int)bytes);
@@ -89,6 +95,7 @@ int netread(int fd, void * buf, size_t bytes)
 		buf = NULL;
 		exit(0);
 	}
+	
 	return bytesRead;
 
 }
@@ -103,7 +110,7 @@ int netwrite(int fd, void * buf, size_t bytes)
 	}
 	int clientfd = fd;
 	int netsocket = createSocket();
-	char client_message[256];
+	char client_message[4100];
 	char server_response[256];
 
 
@@ -183,9 +190,16 @@ int createSocket()
 
  int netserverinit(char * hostname, int filemode){
 	struct hostent * serverinfo;
+ if(filemode > 2)
+ {
+ puts("Error: Invalid File Mode");
+ exit(0);
+ }
 	FileMode = filemode;
+  
 	if((serverinfo = gethostbyname(hostname)) == NULL)
 	{
+		h_errno = HOST_NOT_FOUND;
 		herror("Error");
 		return -1;
 	}

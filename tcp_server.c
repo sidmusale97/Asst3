@@ -12,30 +12,48 @@ void handleRead(char * cmessage, int client_socket);
 void handleOpen(char * cmessage, int client_socket);
 void handleWrite(char * cmessage, int client_socket);
 void handleClose(char * cmessage, int client_socket);
-void cleanLL();
+void * monitorThread(void * arg);
+void insertQueueNode(QueueNode * node); 
+void removeQueueNode(QueueNode * node);
+pthread_cond_t cond;
+QueueNode * queue = NULL;
 
-pthread_mutex_t mutex;
-sem_t socketsemaphore;
+pthread_mutex_t insertlock;
+pthread_mutex_t deletelock;
+pthread_mutex_t queuelock;
+
+
+
 fdNode * allfds = NULL;
 	
 int main()
 {
+	struct timeval lastTime,currentTime;
 	int server_socket = createServerSocket();
 	int * client_socket;
-	pthread_t tid;
-	sem_init(&socketsemaphore, 0, 10);
-	pthread_mutex_init(&mutex, NULL);
+	pthread_t tid,monitor;
+	pthread_mutex_init(&insertlock, NULL);
+  	pthread_mutex_init(&deletelock, NULL);
+  	pthread_mutex_init(&queuelock, NULL);
+  	gettimeofday(&lastTime, NULL);
 	while (1)
 	{
+	gettimeofday(&currentTime,NULL);
+	if (currentTime.tv_sec - lastTime.tv_sec >= 3.0)
+	{
+		pthread_create(&monitor,NULL,monitorThread,NULL);
+		lastTime.tv_sec = currentTime.tv_sec;
+    	lastTime.tv_usec = currentTime.tv_usec;
+	}
 	client_socket = (int *)malloc(sizeof(int));
-	sem_wait(&socketsemaphore);
 	*client_socket = accept(server_socket, NULL, NULL);
 	pthread_create(&tid,NULL,handleRequest,client_socket);
 	}
-	cleanLL();
-	pthread_mutex_destroy(&mutex);
+	pthread_mutex_destroy(&insertlock);
+    pthread_mutex_destroy(&deletelock);
 	return 0;
 }
+
 
 int createServerSocket()
 {
@@ -57,7 +75,7 @@ int createServerSocket()
 	bind(server_socket, (struct sockaddr *) &server_address, sizeof(server_address));
 
 	//determine how many connections can wait for a return
-	listen(server_socket, 5);
+	listen(server_socket, 10);
 
 	return server_socket;
 }
@@ -67,7 +85,7 @@ void * handleRequest(void * arg)
 	int client_socket = *((int *)arg);
 	pthread_detach(pthread_self());
 	free(arg);
-	char client_message[4000] = {0};
+	char client_message[4100] = {0};
 	char server_message[256] = {0};
 	read(client_socket, &client_message, 4000);//receive client socket and client_message
 	char dels[2] = ","; //delimeters for strtok
@@ -78,8 +96,22 @@ void * handleRequest(void * arg)
 	else if(funcID == '3')handleClose(cmessage,client_socket); //if netclose
 	else if(funcID == '4')handleWrite(cmessage, client_socket); //if netwrite	
 	close(client_socket);
-	sem_post(&socketsemaphore);
+	
 	return NULL;
+}
+
+void * monitorThread(void * arg)
+{
+	QueueNode * ptr = queue;
+	while(ptr != NULL)
+		{
+			struct timeval ctime;
+			gettimeofday(&ctime,NULL);
+			if(ctime.tv_sec - ptr->secs >= 2)
+			{
+				ptr->valid = 0;
+			}
+		}
 }
 
 void insertfdNode(fdNode * node)
@@ -91,6 +123,23 @@ void insertfdNode(fdNode * node)
 	else
 	{
 		fdNode * ptr = allfds;
+		while(ptr->next != NULL)
+		{
+			ptr = ptr->next;
+		}
+		ptr->next = node;
+	}
+}
+
+void insertQueueNode(QueueNode * node)
+{
+	if (queue == NULL)
+	{
+		queue = node;
+	}
+	else
+	{
+		QueueNode * ptr = queue;
 		while(ptr->next != NULL)
 		{
 			ptr = ptr->next;
@@ -159,6 +208,7 @@ void deletefdNode(int clientfd)
 	}
 }
 
+
 void handleOpen(char * cmessage, int client_socket)
 {
 	char server_message[256] = {0};
@@ -175,6 +225,81 @@ void handleOpen(char * cmessage, int client_socket)
 	tok = strtok(NULL, dels);//move to next parameter with is file mode
 	int fileMode = atoi(tok);
 	//Attempt to open file
+	fdNode * temp = get_Nodes_from_path(path,allfds);
+	if (temp != NULL)//if transaction mode and file is opened in another client
+	{
+   if(temp->fileMode == 2 || fileMode == 2)
+    { 
+    	puts("here");
+    	struct timeval ctime;
+    	gettimeofday(&ctime, NULL);
+		QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
+		node->secs = ctime.tv_sec;			
+		node->valid = 1;
+		node->tid = pthread_self();
+		node->path = path;
+		node->openMode = openMode;
+		node->fileMode = fileMode;
+		node->ready = 0;
+		pthread_mutex_lock(&insertlock);
+		insertQueueNode(node);
+		pthread_mutex_unlock(&insertlock);
+		while(node->ready == 0 && node->valid)
+		{
+			sleep(1);
+		}
+      	if(node->valid == 0)
+      	{
+      	removeQueueNode(node);
+      	errno = EWOULDBLOCK;
+      	char * errDes = strerror(errno);
+		sprintf(server_message, "%d", ETIMEDOUT);
+		strcat(server_message,",Error: ");
+		strcat(server_message,errDes);
+		write(client_socket,server_message, sizeof(server_message));
+		return;	
+      	}
+      	removeQueueNode(node);
+	  }
+	  else if(openMode == O_WRONLY || openMode == O_RDWR)
+	  {
+		while(temp != NULL)
+		{
+			if(fileMode == 1 && temp->openMode != O_RDONLY)
+				{
+				struct timeval ctime;
+    			gettimeofday(&ctime, NULL);
+				QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
+				node->secs = ctime.tv_sec;
+				node->tid = pthread_self();
+				node->path = path;
+				node->openMode = openMode;
+				node->fileMode = fileMode;
+				node->ready = 0;
+				pthread_mutex_lock(&insertlock);
+				insertQueueNode(node);
+				pthread_mutex_unlock(&insertlock);
+         while(node->ready == 0 && node->valid)
+	       {
+			  sleep(1);
+		   }
+		   if(node->valid == 0)
+      		{
+      		removeQueueNode(node);
+      		errno = EWOULDBLOCK;
+      		char * errDes = strerror(errno);
+			sprintf(server_message, "%d", ETIMEDOUT);
+			strcat(server_message,",Error: ");
+			strcat(server_message,errDes);
+			write(client_socket,server_message, sizeof(server_message));	
+      		}
+       		removeQueueNode(node);
+     	    break;
+			}
+			temp = get_Nodes_from_path(path,temp->next);
+		}
+	}
+ }
 	int fd = open(path,openMode);
 	if (fd < 0)
 	{
@@ -186,28 +311,6 @@ void handleOpen(char * cmessage, int client_socket)
 	}
 	else
 	{
-		fdNode * temp = get_Nodes_from_path(path,allfds);
-		if (fileMode == 2 &&  temp != NULL)//if transaction mode and file is opened in another client
-		{
-		sprintf(server_message, "%d", -1);
-		strcat(server_message,",Error: Invalid permission in transcation mode. File is opened in another client");
-		write(client_socket,server_message, sizeof(server_message));
-		return;	
-		}
-		if(fileMode == 1 && temp != NULL)
-		{
-			while(temp != NULL)
-			{
-				if(temp->openMode == O_WRONLY || temp->openMode == O_RDWR)
-				{
-					sprintf(server_message, "%d", -1);
-					strcat(server_message,",Error: Invalid permission in exclusive mode. File is opened with write permission in another client");
-					write(client_socket,server_message, sizeof(server_message));
-					return;
-				}
-				temp = get_Nodes_from_path(path,temp->next);
-			}
-		}	
 		fdNode * newNode = (fdNode*)malloc(sizeof(fdNode));
 		newNode->path = path;
 		newNode->fileMode = fileMode;
@@ -215,16 +318,16 @@ void handleOpen(char * cmessage, int client_socket)
 		newNode->clientfd = getFreeClientfd();
 		newNode->openMode = openMode;
 		newNode->next = NULL;
-		pthread_mutex_lock(&mutex);
+		pthread_mutex_lock(&insertlock);
 		insertfdNode(newNode);
-		pthread_mutex_unlock(&mutex);
+		pthread_mutex_unlock(&insertlock);
 		sprintf(server_message, "%d",newNode->clientfd);
 		write(client_socket,server_message, sizeof(server_message));
 	}
 }
 
 void handleRead(char * cmessage, int client_socket){
-	char server_message[256] = {0};
+	
 	char dels[2] = ","; //delimeters for strtok 
 
 	char * tok = strtok(cmessage,dels);	//tok holds the int sent at the front of client_message
@@ -232,6 +335,8 @@ void handleRead(char * cmessage, int client_socket){
 	int bytesRequested = atoi(tok);
 	tok = strtok(NULL, dels);
 	int clientfd = atoi(tok);
+  char server_message[bytesRequested + 10];
+	char buffer[bytesRequested+1];
 	fdNode * temp = get_Node_from_cfd(clientfd);
 	if (temp == NULL)
 	{
@@ -240,7 +345,6 @@ void handleRead(char * cmessage, int client_socket){
 		write(client_socket,server_message, sizeof(server_message));
 	}
 	int serverfd = temp->serverfd;
-	char buffer[bytesRequested+1];
 
 	int readFile = read(serverfd,buffer,bytesRequested);
 	if(readFile < 0)
@@ -290,9 +394,22 @@ void handleClose(char * cmessage, int client_socket)
 		}
 	else
 		{
-		pthread_mutex_lock(&mutex);
+		if (!isEmpty())
+		{
+			QueueNode * ptr = queue;
+			while (ptr != NULL)
+				{
+					if(strcmp(ptr->path,temp->path))
+					{
+						ptr->ready = 1;
+						break;
+					}
+					ptr = ptr->next;
+				}
+		}
+		pthread_mutex_lock(&deletelock);
 		deletefdNode(clientfd);
-		pthread_mutex_unlock(&mutex);
+		pthread_mutex_unlock(&deletelock);
 		sprintf(server_message, "%d", closeFile);
 		write(client_socket,server_message,sizeof(server_message));	
 		}
@@ -319,9 +436,9 @@ void handleWrite(char * cmessage, int client_socket)
 		write(client_socket,server_message, sizeof(server_message));
 	}
 	int serverfd = temp->serverfd;
-	pthread_mutex_lock(&mutex); //if unrestricted mode lock to prevent race condition
+	pthread_mutex_lock(&deletelock); //if unrestricted mode lock to prevent race condition
 	int writeFile = write(serverfd,(void *)buffer,bytesToWrite);
-	pthread_mutex_unlock(&mutex);
+	pthread_mutex_unlock(&deletelock);
 	if(writeFile != bytesToWrite)
 	{
 		char * errDes = strerror(errno);
@@ -337,15 +454,55 @@ void handleWrite(char * cmessage, int client_socket)
 	}
 }
 
-void cleanLL()
-{	
-	fdNode * temp = allfds;
-	fdNode * next = allfds->next;
-	while(temp != NULL)
+int isEmpty()
+{
+	if (queue == NULL)
+		return 1;
+	else
+		return 0;
+}
+
+void removeQueueNode(QueueNode * node)
+{
+	QueueNode * ptr = queue;
+	QueueNode * prev = NULL;
+	while(ptr != NULL){
+	if(ptr == node)
 	{
-		close(temp->serverfd);
-		free(temp->path);
-		free(temp);	
-		temp = next;
+		if(ptr->next == NULL && prev != NULL)
+		{
+		free(ptr->path);
+		free(ptr);
+    	ptr = NULL; 
+		prev->next = NULL;
+		break;
+		}
+    else if(ptr->next != NULL && ptr == queue)
+    {
+    queue = queue->next;
+    free(ptr->path);
+		free(ptr);
+     break;
+    }
+    else if(ptr->next == NULL && ptr == queue)
+    {
+    queue = NULL;
+    free(ptr->path);
+		free(ptr);
+     break;
+    }
+		else if(ptr->next != NULL && prev != NULL)
+		{
+		prev->next = ptr->next->next;
+		free(ptr->path);
+		free(ptr);
+		break;
+		}
 	}
+	else
+		{
+			prev = ptr;
+			ptr = ptr->next;
+		}
+}
 }
