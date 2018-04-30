@@ -1,9 +1,8 @@
 CC = gcc
 
-server: tcp_server.c
-	$(CC) -o server tcp_server.c -lpthread
-client: tcp_client.c
-	 $(CC) -o client tcp_client.c
+server: netfileserver.c
+	$(CC) -o server netfileserver.c -lpthread
+client: libnetfiles.c	 $(CC) -o client libnetfiles.c
 
 clean:
 	rm server client
