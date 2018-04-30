@@ -211,7 +211,7 @@ int createSocket()
 	 bzero((char*) &saddress, sizeof(saddress));
 	 saddress.sin_family = AF_INET;
 	 bcopy((char*) serverinfo->h_addr, (char*) &saddress.sin_addr.s_addr, serverinfo->h_length));
-	 saddress.sin_port = htons(portno);
+	
 	 
 	 int connection = connect(sockfd, (struct sockaddr*) &saddress, sizeof(saddress))<0);
 	 if(connection <0){
