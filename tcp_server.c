@@ -230,7 +230,6 @@ void handleOpen(char * cmessage, int client_socket)
 	{
    if(temp->fileMode == 2 || fileMode == 2)
     { 
-    	puts("here");
     	struct timeval ctime;
     	gettimeofday(&ctime, NULL);
 		QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
@@ -263,14 +262,15 @@ void handleOpen(char * cmessage, int client_socket)
 	  }
 	  else if(openMode == O_WRONLY || openMode == O_RDWR)
 	  {
+	  	QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
 		while(temp != NULL)
 		{
 			if(fileMode == 1 && temp->openMode != O_RDONLY)
 				{
 				struct timeval ctime;
     			gettimeofday(&ctime, NULL);
-				QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
 				node->secs = ctime.tv_sec;
+				node->valid = 1;
 				node->tid = pthread_self();
 				node->path = path;
 				node->openMode = openMode;
@@ -279,12 +279,16 @@ void handleOpen(char * cmessage, int client_socket)
 				pthread_mutex_lock(&insertlock);
 				insertQueueNode(node);
 				pthread_mutex_unlock(&insertlock);
-         while(node->ready == 0 && node->valid)
+				break;
+			}
+			temp = get_Nodes_from_path(path,temp->next);
+		}
+		while(node->ready == 0 && node->valid)
 	       {
 			  sleep(1);
 		   }
-		   if(node->valid == 0)
-      		{
+		 if(node->valid == 0)
+      	{
       		removeQueueNode(node);
       		errno = EWOULDBLOCK;
       		char * errDes = strerror(errno);
@@ -292,12 +296,8 @@ void handleOpen(char * cmessage, int client_socket)
 			strcat(server_message,",Error: ");
 			strcat(server_message,errDes);
 			write(client_socket,server_message, sizeof(server_message));	
-      		}
+      	}
        		removeQueueNode(node);
-     	    break;
-			}
-			temp = get_Nodes_from_path(path,temp->next);
-		}
 	}
  }
 	int fd = open(path,openMode);
