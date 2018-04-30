@@ -210,10 +210,10 @@ int createSocket()
 	}
 	 bzero((char*) &saddress, sizeof(saddress));
 	 saddress.sin_family = AF_INET;
-	 bcopy((char*) serverinfo->h_addr, (char*) &saddress.sin_addr.s_addr, serverinfo->h_length));
+	 bcopy((char*) serverinfo->h_addr, (char*) &saddress.sin_addr.s_addr, serverinfo->h_length);
 	
 	 
-	 int connection = connect(sockfd, (struct sockaddr*) &saddress, sizeof(saddress))<0);
+	 int connection = connect(sockfd, (struct sockaddr*) &saddress, sizeof(saddress));
 	 if(connection <0){
 		 herror("Connection Error");
 		 exit(0);
