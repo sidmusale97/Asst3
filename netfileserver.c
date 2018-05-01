@@ -226,7 +226,7 @@ void handleOpen(char * cmessage, int client_socket)
 	int fileMode = atoi(tok);
 	//Attempt to open file
 	fdNode * temp = get_Nodes_from_path(path,allfds);
-	if (temp != NULL)//if transaction mode and file is opened in another client
+	if (temp != NULL)
 	{
    if(temp->fileMode == 2 || fileMode == 2)
     { 
@@ -250,7 +250,7 @@ void handleOpen(char * cmessage, int client_socket)
       	if(node->valid == 0)
       	{
       	removeQueueNode(node);
-      	errno = EWOULDBLOCK;
+      	errno = ETIMEDOUT;
       	char * errDes = strerror(errno);
 		sprintf(server_message, "%d", ETIMEDOUT);
 		strcat(server_message,",Error: ");
@@ -263,6 +263,7 @@ void handleOpen(char * cmessage, int client_socket)
 	  else if(openMode == O_WRONLY || openMode == O_RDWR)
 	  {
 	  	QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
+	  	int nodefound = 0;
 		while(temp != NULL)
 		{
 			if(fileMode == 1 && temp->openMode != O_RDONLY)
@@ -279,10 +280,12 @@ void handleOpen(char * cmessage, int client_socket)
 				pthread_mutex_lock(&insertlock);
 				insertQueueNode(node);
 				pthread_mutex_unlock(&insertlock);
+				nodefound = 1;
 				break;
 			}
 			temp = get_Nodes_from_path(path,temp->next);
 		}
+		if(nodefound){
 		while(node->ready == 0 && node->valid)
 	       {
 			  sleep(1);
@@ -290,7 +293,7 @@ void handleOpen(char * cmessage, int client_socket)
 		 if(node->valid == 0)
       	{
       		removeQueueNode(node);
-      		errno = EWOULDBLOCK;
+      		errno = ETIMEDOUT;
       		char * errDes = strerror(errno);
 			sprintf(server_message, "%d", ETIMEDOUT);
 			strcat(server_message,",Error: ");
@@ -298,6 +301,7 @@ void handleOpen(char * cmessage, int client_socket)
 			write(client_socket,server_message, sizeof(server_message));	
       	}
        		removeQueueNode(node);
+       	}
 	}
  }
 	int fd = open(path,openMode);
