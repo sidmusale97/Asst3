@@ -1,0 +1,3 @@
+zoo animals: birds ostrich giraffe elephants zebra lion
+
+house pets: birds dogs cats
