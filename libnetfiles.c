@@ -2,25 +2,26 @@
 
 int createSocket();
 
-//struct in_addr * serveraddress;
-struct in_addr * saddress;
+struct sockaddr_in address;
+pthread_t close;
 int main(int argc, char ** argv)
 {
-	//int sn = netserverinit("cp.cs.rutgers.edu");
-	//if(sn == -1)
-	//{
-	//	exit(0);
-	//}	
+	
+	int sn = netserverinit("cd.cs.rutgers.edu",0);
+	if(sn == -1)
+	{
+		puts("netserverinit error");
+		exit(0);
+	}
 	char a[21] = "hello my name is sid";
 	char b[50] = {0};
-	int openType = O_RDWR;
-	int file = netopen("hey.txt", openType);
+	int file = netopen("A.txt", O_RDWR);
 	printf("File Descriptor from server:\n%d\n", file);
 	int written = netwrite(file,(void *)&a,20);
 	printf("Bytes written: %d\n",written);
 	//int closeFile = netclose(file);
 	//printf("File closed: %d\n", closeFile);
-	int file2 = netopen("hey.txt", openType);
+	int file2 = netopen("A.txt", O_RDWR);
 	printf("File Descriptor from server:\n%d\n", file2);
 	int readFile = netread(file2, (void *)&b, 50);
 	puts(b);
@@ -164,7 +165,7 @@ int createSocket()
 {
 	//create socket
 	int netsocket;
-	
+	char buffer[100] = {0};
 	netsocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (netsocket == -1)
 	{
@@ -172,12 +173,9 @@ int createSocket()
 	return -1;
 	}
 
-	//specify socket address
-	struct sockaddr_in address;
-	address.sin_family = AF_INET;
-	address.sin_port = htons(PORT);
-	address.sin_addr.s_addr = INADDR_ANY;
-
+	//address.sin_family = AF_INET;
+	//address.sin_port = htons(PORT);
+	//address.sin_addr.s_addr = INADDR_ANY;
 	//attempt socket connection
 	int connection_status = connect(netsocket, (struct sockaddr *) &address, sizeof(address));
 	if (connection_status == -1)
@@ -189,36 +187,24 @@ int createSocket()
 }
 
  int netserverinit(char * hostname, int filemode){
-	struct hostent * serverinfo;
-	 struct sockaddr_in saddress;
+ struct hostent * serverinfo;
  if(filemode > 2)
  {
  puts("Error: Invalid File Mode");
  exit(0);
  }
-	FileMode = filemode;
-  	int sockfd = createSocket();
-	if(sockfd<0){
-		herror("Error creating socket");
-	}
-	 
+	FileMode = filemode;	 
 	if((serverinfo = gethostbyname(hostname)) == NULL)
 	{
 		h_errno = HOST_NOT_FOUND;
 		herror("Error");
-		return -1;
+		exit(0);
 	}
-	 bzero((char*) &saddress, sizeof(saddress));
-	 saddress.sin_family = AF_INET;
-	 bcopy((char*) serverinfo->h_addr, (char*) &saddress.sin_addr.s_addr, serverinfo->h_length);
-	
+	bzero((char*) &address, sizeof(address));
+	address.sin_family = AF_INET;
+	bcopy((char*) serverinfo->h_addr, (char*) address.sin_addr.s_addr, serverinfo->h_length);
+	address.sin_port = htons(PORT);
 	 
-	 int connection = connect(sockfd, (struct sockaddr*) &saddress, sizeof(saddress));
-	 if(connection <0){
-		 herror("Connection Error");
-		 exit(0);
-	 }	 
-	
 	return 0;
 
 }

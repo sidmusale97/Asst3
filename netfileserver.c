@@ -21,30 +21,22 @@ QueueNode * queue = NULL;
 pthread_mutex_t insertlock;
 pthread_mutex_t deletelock;
 pthread_mutex_t queuelock;
-
-
-
+pthread_t monitor;
+struct timeval serverTime;
+int monitor_is_on = 0;
 fdNode * allfds = NULL;
 	
 int main()
 {
-	struct timeval lastTime,currentTime;
 	int server_socket = createServerSocket();
 	int * client_socket;
-	pthread_t tid,monitor;
+	pthread_t tid;
 	pthread_mutex_init(&insertlock, NULL);
   	pthread_mutex_init(&deletelock, NULL);
   	pthread_mutex_init(&queuelock, NULL);
-  	gettimeofday(&lastTime, NULL);
+  	
 	while (1)
-	{
-	gettimeofday(&currentTime,NULL);
-	if (currentTime.tv_sec - lastTime.tv_sec >= 3.0)
-	{
-		pthread_create(&monitor,NULL,monitorThread,NULL);
-		lastTime.tv_sec = currentTime.tv_sec;
-    	lastTime.tv_usec = currentTime.tv_usec;
-	}
+	{	
 	client_socket = (int *)malloc(sizeof(int));
 	*client_socket = accept(server_socket, NULL, NULL);
 	pthread_create(&tid,NULL,handleRequest,client_socket);
@@ -112,6 +104,7 @@ void * monitorThread(void * arg)
 				ptr->valid = 0;
 			}
 		}
+	monitor_is_on = 0;
 }
 
 void insertfdNode(fdNode * node)
@@ -171,12 +164,14 @@ fdNode * get_Node_from_cfd(int clientfd)
 	return ptr;
 }
 
-	fdNode * get_Nodes_from_path(char * path, fdNode * start){
+fdNode * get_Nodes_from_path(char * path, fdNode * start){
 	fdNode * ptr = start;
 	if (start == NULL)return NULL;
-	while((strcmp(path,ptr->path) != 0) && ptr != NULL)
+	while((strcmp(path,ptr->path) != 0))
 	{
 		ptr = ptr->next;
+		if (ptr == NULL)
+			return NULL;
 	}
 	return ptr;
 }
@@ -236,7 +231,8 @@ void handleOpen(char * cmessage, int client_socket)
 		node->secs = ctime.tv_sec;			
 		node->valid = 1;
 		node->tid = pthread_self();
-		node->path = path;
+		node->path = (char *)malloc(strlen(path));
+		strcpy(node->path,path);
 		node->openMode = openMode;
 		node->fileMode = fileMode;
 		node->ready = 0;
@@ -245,6 +241,12 @@ void handleOpen(char * cmessage, int client_socket)
 		pthread_mutex_unlock(&insertlock);
 		while(node->ready == 0 && node->valid)
 		{
+			gettimeofday(&serverTime,NULL);
+			if (serverTime.tv_sec - ctime.tv_sec >= 3.0  && !monitor_is_on)
+			{
+			monitor_is_on = 1;
+			pthread_create(&monitor,NULL,monitorThread,NULL);
+			}
 			sleep(1);
 		}
       	if(node->valid == 0)
@@ -263,17 +265,18 @@ void handleOpen(char * cmessage, int client_socket)
 	  else if(openMode == O_WRONLY || openMode == O_RDWR)
 	  {
 	  	QueueNode * node = (QueueNode *)malloc(sizeof(QueueNode));
+	  	struct timeval ctime;
 	  	int nodefound = 0;
 		while(temp != NULL)
 		{
 			if(fileMode == 1 && temp->openMode != O_RDONLY)
 				{
-				struct timeval ctime;
     			gettimeofday(&ctime, NULL);
 				node->secs = ctime.tv_sec;
 				node->valid = 1;
 				node->tid = pthread_self();
-				node->path = path;
+				node->path = (char *)malloc(strlen(path));
+				strcpy(node->path,path);
 				node->openMode = openMode;
 				node->fileMode = fileMode;
 				node->ready = 0;
@@ -288,7 +291,13 @@ void handleOpen(char * cmessage, int client_socket)
 		if(nodefound){
 		while(node->ready == 0 && node->valid)
 	       {
-			  sleep(1);
+			gettimeofday(&serverTime,NULL);
+			if (serverTime.tv_sec - ctime.tv_sec >= 3.0  && !monitor_is_on)
+			{
+			monitor_is_on = 1;
+			pthread_create(&monitor,NULL,monitorThread,NULL);
+			}
+			sleep(1);
 		   }
 		 if(node->valid == 0)
       	{
@@ -380,6 +389,7 @@ void handleClose(char * cmessage, int client_socket)
 	tok = strtok(NULL, dels);//move to next parameter which is clientfd
 	int clientfd = atoi(tok);
 	fdNode * temp = get_Node_from_cfd(clientfd);
+	printf("%d\n", clientfd);
 	if (temp == NULL)
 	{
 		sprintf(server_message, "%d", -1);
@@ -403,7 +413,7 @@ void handleClose(char * cmessage, int client_socket)
 			QueueNode * ptr = queue;
 			while (ptr != NULL)
 				{
-					if(strcmp(ptr->path,temp->path))
+					if(strcmp(ptr->path,temp->path) == 0)
 					{
 						ptr->ready = 1;
 						break;
